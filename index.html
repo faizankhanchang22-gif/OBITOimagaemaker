@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Obito AI Maker - RishuAPI</title>
+
+<style>
+/* CSS is the same as before to keep the style you like */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;background:transparent!important;color:#fff;font-family:Arial, sans-serif;overflow:hidden;}
+.splash-screen{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);display:flex;justify-content:center;align-items:center;z-index:1000;}
+.splash-screen.hidden{display:none}
+.start-btn{padding:18px 50px;font-size:22px;font-weight:bold;background:linear-gradient(135deg,#a855f7,#06b6d4);color:#fff;border:none;border-radius:50px;cursor:pointer;box-shadow: 0 0 20px rgba(168, 85, 247, 0.5);transition: transform 0.2s;}
+.start-btn:active{transform:scale(0.95);}
+.main-app{display:none; width:100%; height:100%;}
+.main-app.active{display:block}
+.video-bg{position:fixed;top:0;left:0;width:100%;height:100%;object-fit:cover;z-index:-1;}
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.4);z-index:0;}
+.container{position:relative;z-index:5;width:100%;height:100%;padding:20px;overflow-y:auto;display: flex;flex-direction: column;}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px;}
+.header-left h1{font-size:22px;background:linear-gradient(90deg,#a855f7,#06b6d4);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight: 800;text-transform: uppercase;letter-spacing: 1px;}
+.back-btn{padding:8px 15px;border-radius:6px;border:1px solid #ef4444;background:rgba(239, 68, 68, 0.15);color:#fca5a5;font-weight:bold;cursor:pointer;font-size: 12px;}
+.section{width:100%;background:rgba(0,0,0,0.4);padding:20px;border-radius:15px;border: 1px solid rgba(255,255,255,0.05);margin-bottom:20px;}
+textarea{width:100%;height:100px;background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(168,85,247,.3);border-radius:10px;padding:15px;font-size:16px;outline:none; resize: none;}
+textarea:focus{ border-color: #06b6d4; background:rgba(255,255,255,.15); }
+.generate-btn{width:100%;margin-top:15px;padding:14px;background:linear-gradient(135deg,#a855f7,#06b6d4);color:#fff;border:none;border-radius:10px;font-size:16px;font-weight:bold;cursor:pointer;text-transform: uppercase;letter-spacing: 1px;box-shadow: 0 4px 15px rgba(168, 85, 247, 0.3);}
+.generate-btn:disabled{ opacity: 0.7; cursor: wait; }
+.result-area{width:100%;text-align:center;padding:20px;min-height: 200px;display: flex;flex-direction: column;align-items: center;justify-content: center;}
+.generated-image{width:100%;max-width: 512px;border-radius:12px;box-shadow:0 0 30px rgba(0,0,0,0.5);margin-bottom:15px;animation: fadeIn 0.5s ease;}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+.download-btn{padding:12px 30px;background:#10b981;border:none;border-radius:8px;font-size:14px;color:white;font-weight: bold;display: flex; align-items: center; gap: 8px;cursor:pointer;}
+.loader {border: 3px solid rgba(255, 255, 255, 0.1);border-radius: 50%;border-top: 3px solid #06b6d4;width: 30px; height: 30px;animation: spin 0.8s linear infinite;margin: 10px auto;display: none;}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+.error-message {margin-top:15px;padding:12px;background:rgba(220, 38, 38, 0.2);border-left: 4px solid #ef4444;color: #fca5a5;border-radius:4px;display:none;text-align: left;font-size: 14px;}
+.error-message.show{display:block}
+</style>
+</head>
+
+<body>
+
+<div class="splash-screen" id="splashScreen">
+    <button class="start-btn" onclick="startApp()">START CREATING ⚡</button>
+</div>
+
+<div class="main-app" id="mainApp">
+    <video class="video-bg" autoplay loop playsinline muted>
+        <source src="https://raw.githubusercontent.com/faizankhanchang22-gif/Fauzuna/0d8386c8d7fa219d8a3390a01ba59402d7b31dab/AQPYKYVB-nMO-Ray4szZJNQQ3QMxLMzxeRYxOgW2bFyfnEB9m7qPgNqa0mY7l9gcciWi1SarcQgjp0Jk6Ttxa24kVYMMqMFOyUCWh5o.mp4">
+    </video>
+    <div class="overlay"></div>
+
+    <div class="container">
+        <header>
+            <div class="header-left"><h1>OBITO AI MAKER</h1></div>
+            <button class="back-btn" onclick="location.reload()">RESET</button>
+        </header>
+
+        <div class="section">
+            <textarea id="promptInput" placeholder="Describe your imagination..."></textarea>
+            <button class="generate-btn" id="generateBtn" onclick="processImage()">
+                <span id="btnText">GENERATE</span>
+            </button>
+            <div class="loader" id="loader"></div>
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+
+        <div class="section result-area" id="resultArea">
+            <p style="color: #888; font-size: 14px;">Art will appear here</p>
+        </div>
+    </div>
+</div>
+
+<script>
+// 🔥 PRIMARY API (User Provided - RishuAPI)
+const API_PRIMARY = "https://image-gen.rishuapi.workers.dev/?prompt="; 
+// 💡 BACKUP API (Pollinations - If primary fails)
+const API_BACKUP = "https://image.pollinations.ai/prompt/"; 
+
+function startApp(){
+    document.getElementById("splashScreen").classList.add("hidden");
+    document.getElementById("mainApp").classList.add("active");
+    let v = document.querySelector(".video-bg");
+    v.muted = false;
+    v.play().catch(()=>{});
+}
+
+async function processImage(){
+    let prompt = document.getElementById("promptInput").value.trim();
+    let result = document.getElementById("resultArea");
+    let btn = document.getElementById("generateBtn");
+    let btnText = document.getElementById("btnText");
+    let loader = document.getElementById("loader");
+    let errorDiv = document.getElementById("errorMessage");
+
+    document.querySelector(".video-bg").play().catch(()=>{});
+
+    if(!prompt){
+        errorDiv.textContent = "⚠️ Please enter a prompt!";
+        errorDiv.classList.add("show");
+        return;
+    }
+    
+    // UI Loading State Reset
+    result.innerHTML = "";
+    errorDiv.classList.remove("show");
+    btn.disabled = true;
+    btnText.textContent = "GENERATING (Primary Server)...";
+    loader.style.display = "block";
+
+    // 1. Try Primary API (RishuAPI)
+    let primarySuccess = false;
+    try {
+        const finalUrl = API_PRIMARY + encodeURIComponent(prompt);
+        
+        let img = new Image();
+        const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout (30s)")), 30000));
+        
+        const loadPromise = new Promise((resolve, reject) => {
+            img.onload = () => resolve(img.src);
+            img.onerror = () => reject(new Error("Image Load Failed"));
+            img.src = finalUrl;
+        });
+
+        const loadedUrl = await Promise.race([loadPromise, timeout]);
+        
+        primarySuccess = true;
+        showResult(loadedUrl);
+
+    } catch (error) {
+        console.warn("Primary API failed or timed out. Switching to backup.");
+    }
+    
+    // 2. If Primary Fails, Try Backup (Pollinations)
+    if (!primarySuccess) {
+        btnText.textContent = "GENERATING (Using Backup Server)...";
+        try {
+            const finalUrl = API_BACKUP + encodeURIComponent(prompt) + "?width=512&height=512&nodelay=true&seed=" + Date.now();
+            
+            let img = new Image();
+            const timeout = new Promise((_, reject) => setTimeout(() => reject(new Error("Backup Timeout (60s)")), 60000));
+
+            const loadPromise = new Promise((resolve, reject) => {
+                img.onload = () => resolve(img.src);
+                img.onerror = () => reject(new Error("Backup Load Failed"));
+                img.src = finalUrl;
+            });
+            
+            const loadedUrl = await Promise.race([loadPromise, timeout]);
+            
+            showResult(loadedUrl);
+            
+        } catch (error) {
+            // Both APIs failed
+            console.error("Both APIs failed:", error);
+            errorDiv.textContent = `❌ Both servers failed. Error: ${error.message}. Try a different prompt or wait a minute.`;
+            errorDiv.classList.add("show");
+            
+            // Reset state
+            result.innerHTML = '<p style="color: #fca5a5;">Failed to generate image.</p>';
+            btn.disabled = false;
+            btnText.textContent = "TRY AGAIN";
+            loader.style.display = "none";
+        }
+    }
+}
+
+function showResult(url){
+    let result = document.getElementById("resultArea");
+    let loader = document.getElementById("loader");
+    let btn = document.getElementById("generateBtn");
+    
+    result.innerHTML = `
+        <img src="${url}" class="generated-image">
+        <button class="download-btn" onclick="downloadImage('${url}')">⬇ DOWNLOAD</button>
+    `;
+
+    loader.style.display = "none";
+    btn.disabled = false;
+    document.getElementById("btnText").textContent = "GENERATE AGAIN";
+}
+
+async function downloadImage(url){
+    // Using fetch/blob for reliable download
+    try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = "Obito-Art-" + Date.now() + ".png";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+        // Fallback
+        window.open(url, '_blank');
+        console.error("Download failed, opened image in new tab.");
+    }
+}
+
+</script>
+</body>
+</html>
